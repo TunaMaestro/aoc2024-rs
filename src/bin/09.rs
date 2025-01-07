@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 advent_of_code::solution!(9);
 
 fn to_blocks(input: &str) -> (Vec<usize>, Vec<isize>) {
@@ -40,7 +41,6 @@ pub fn part_one(input: &str) -> Option<usize> {
     let mut right = fs.len() - 1;
     while left < right {
         fs[left] = fs[right];
-        let right_block_i = fs[right];
         fs[right] = -1;
         left += 1;
         right -= 1;
@@ -113,19 +113,93 @@ pub fn part_two_shit(input: &str) -> Option<usize> {
 
     p(&fs);
 
-    Some(
-        fs.iter()
-            .enumerate()
-            .filter(|(_, &x)| x >= 0)
-            .map(|(i, &x)| i * (x as usize))
-            .sum(),
-    )
+    Some(score(&fs))
+}
+
+fn score(fs: &[isize]) -> usize {
+    fs.iter()
+        .enumerate()
+        .filter(|(_, &x)| x >= 0)
+        .map(|(i, &x)| i * (x as usize))
+        .sum()
+}
+
+fn find_first_free(disk: &[isize], required: usize) -> Option<usize> {
+    // disk.iter()
+    //     .enumerate()
+    //     .fold(None, |acc, x| {
+    //         if x != -1 {
+    //             acc
+    //         } else {
+
+    //         }
+    //     })
+    //     .map(|(index, length)| index)
+
+    let mut start = None;
+    let mut length = 0;
+    for (i, &x) in disk.iter().enumerate() {
+        if length >= required {
+            return start;
+        }
+        if x != -1 {
+            length = 0;
+        } else {
+            if length == 0 {
+                start = Some(i);
+            }
+            length += 1
+        }
+    }
+    if length >= required {
+        start
+    } else {
+        None
+    }
 }
 
 pub fn part_two(input: &str) -> Option<usize> {
-    let (blocks, mut _fs) = to_blocks(input);
+    let (_blocks, mut fs) = to_blocks(input);
 
-    Some(1)
+    // let mut left_open = blocks[0];
+    let mut right_filled = fs.len() - 1;
+
+    while 0 < right_filled {
+        // dbg!(right_filled);
+        // p(&fs);
+
+        let mut right_size = 0;
+        let right_block_id = fs[right_filled];
+        while right_filled > right_size && fs[right_filled - right_size] == right_block_id {
+            right_size += 1;
+        }
+
+        if right_filled - right_size == 0 {
+            break;
+        }
+
+        let left_open = find_first_free(&fs, right_size);
+
+        // eprintln!("{left_open}({left_size}) {right_filled}({right_size})");
+        if let Some(mut left) = left_open
+            && left < right_filled
+        {
+            for _ in 0..right_size {
+                (fs[left], fs[right_filled]) = (fs[right_filled], fs[left]);
+
+                left += 1;
+                right_filled -= 1;
+            }
+        } else {
+            right_filled -= right_size;
+        }
+        while fs[right_filled] == -1 {
+            right_filled -= 1;
+        }
+    }
+    // p(&fs);
+
+    Some(score(&fs))
 }
 
 #[cfg(test)]
@@ -144,6 +218,22 @@ mod tests {
             let result = part_one(&advent_of_code::template::read_file("examples", DAY));
             assert_eq!(result, Some(1928));
         }
+    }
+
+    #[test]
+    fn test_find_first() {
+        assert_eq!(
+            find_first_free(&[-1, -1, -1, 1, 2, 3, -1, -1, -1, -1], 3),
+            Some(0)
+        );
+        assert_eq!(
+            find_first_free(&[-1, -1, -1, 1, 2, 3, -1, -1, -1, -1], 4),
+            Some(6)
+        );
+        assert_eq!(
+            find_first_free(&[-1, -1, -1, 1, 2, 3, -1, -1, -1, -1], 5),
+            None
+        );
     }
 
     #[test]

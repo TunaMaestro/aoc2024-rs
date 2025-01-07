@@ -50,15 +50,15 @@ pub fn part_one(input: &str) -> Option<usize> {
         state = step(&grid, s);
     }
 
-    let view = Grid::new_with_dimensions(seen.dimension(), |x| x).map(|&x| {
-        if grid[x] == b'#' {
-            b'#'
-        } else if seen[x] {
-            b'X'
-        } else {
-            b'.'
-        }
-    });
+    // let _view = Grid::new_with_dimensions(seen.dimension(), |x| x).map(|&x| {
+    //     if grid[x] == b'#' {
+    //         b'#'
+    //     } else if seen[x] {
+    //         b'X'
+    //     } else {
+    //         b'.'
+    //     }
+    // });
 
     // eprintln!("{}", view.display());
 

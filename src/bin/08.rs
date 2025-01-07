@@ -35,7 +35,7 @@ pub fn part_one(input: &str) -> Option<usize> {
     Some(
         antennae
             .into_iter()
-            .map(|(label, antennae_group)| {
+            .map(|(_label, antennae_group)| {
                 let pairs: Vec<(Point, Point)> = antennae_group
                     .iter()
                     .enumerate()
