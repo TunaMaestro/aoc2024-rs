@@ -1,6 +1,6 @@
 use core::panic;
 
-use aoc_utils::grid::{read_grid, Grid, Point, UP_RIGHT_DOWN_LEFT};
+use aoc_utils::grid::{Grid, Point, UP_RIGHT_DOWN_LEFT};
 
 advent_of_code::solution!(6);
 
@@ -31,7 +31,7 @@ fn step(grid: &Grid<u8>, (player, direction): (Point, usize)) -> Option<(Point, 
 }
 
 pub fn part_one(input: &str) -> Option<usize> {
-    let mut grid = read_grid(input, |x| x as u8);
+    let mut grid = Grid::read(input, |x| x as u8);
     let player = grid
         .position(|&x| x == b'^')
         .expect("expected player '^' char in grid");
@@ -60,7 +60,7 @@ pub fn part_one(input: &str) -> Option<usize> {
         }
     });
 
-    eprintln!("{}", view.display());
+    // eprintln!("{}", view.display());
 
     Some(hit)
 }
@@ -79,7 +79,7 @@ fn find_cycle(grid: &Grid<u8>, state: (Point, usize)) -> Option<(Point, usize)> 
 }
 
 pub fn part_two(input: &str) -> Option<usize> {
-    let mut grid = read_grid(input, |x| x as u8);
+    let mut grid = Grid::read(input, |x| x as u8);
     let player = grid
         .position(|&x| x == b'^')
         .expect("expected player '^' char in grid");
@@ -94,19 +94,22 @@ pub fn part_two(input: &str) -> Option<usize> {
     let mut cycles = 0;
 
     // dbg
-    let mut seen = Grid::new_with_dimensions_uniform(grid.dimension(), false);
+    let mut seen = Grid::new_with_dimensions_uniform(grid.dimension(), 0u8);
     // dbg
 
     while let Some(s) = state {
-        if let Some(_p) = prev {
-            grid[s.0] = b'#';
-            let c = find_cycle(&grid, init_state).is_some();
-            // eprintln!("{:?} {}", s.0, c);
-            // cycles += (c as usize);
-            cycles += (c && !seen[s.0]) as usize;
-            seen[s.0] |= c;
-            grid[s.0] = b'.';
+        if seen[s.0] & 1 == 0 {
+            if let Some(p) = prev {
+                grid[s.0] = b'#';
+                let c = find_cycle(&grid, p).is_some();
+                // eprintln!("{:?} {}", s.0, c);
+                // cycles += (c as usize);
+                cycles += (c && !seen[s.0] & 0b10 > 0) as usize;
+                seen[s.0] |= (c as u8) << 1;
+                grid[s.0] = b'.';
+            }
         }
+        seen[s.0] |= 1;
         // next step
         prev = state;
         state = step(&grid, s);
