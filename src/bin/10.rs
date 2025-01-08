@@ -45,6 +45,20 @@ fn dfs(grid: &mut Grid<Cell>, v: Point, visited: &mut HashSet<Point>) {
     // score
 }
 
+fn dfs_2(grid: &mut Grid<Cell>, v: Point) {
+    for dir in UP_RIGHT_DOWN_LEFT {
+        let next = v + dir;
+        if !grid.contains(next) {
+            continue;
+        }
+        if grid[next].height + 1 != grid[v].height {
+            continue;
+        }
+        dfs_2(grid, next);
+    }
+    grid[v].score += 1;
+}
+
 fn search(grid: &mut Grid<Cell>, v: Point) {
     let mut visited = HashSet::new();
     dfs(grid, v, &mut visited)
@@ -85,27 +99,44 @@ pub fn part_one(input: &str) -> Option<usize> {
                 search(&mut grid, point)
             }
         });
-    let res = (0..dim.y)
-        .map(|y| (0..dim.x).map(move |x| point2(x as i32, y as i32)))
-        .flatten()
-        .filter_map(|point| {
-            if grid[point].height == 0 {
-                Some(grid[point].score)
-            } else {
-                None
-            }
-        })
-        .sum();
+
+    let res = score(&grid);
 
     // dbg!(grid.map(|x| x.score).0);
-    p(&grid);
-    println!();
+    // p(&grid);
+    // println!();
 
     Some(res)
 }
 
-pub fn part_two(input: &str) -> Option<u64> {
-    None
+fn score(grid: &Grid<Cell>) -> usize {
+    grid.0
+        .iter()
+        .map(|r| r.iter().map(|x| x.score * ((x.height == 0) as usize)))
+        .flatten()
+        .sum()
+}
+
+pub fn part_two(input: &str) -> Option<usize> {
+    let mut grid = parse(input);
+    let dim = grid.dimension();
+    (0..dim.y)
+        .map(|y| (0..dim.x).map(move |x| point2(x as i32, y as i32)))
+        .flatten()
+        .for_each(|point| {
+            if grid[point].height == 9 {
+                // p(&grid);
+                dfs_2(&mut grid, point)
+            }
+        });
+
+    let res = score(&grid);
+
+    // dbg!(grid.map(|x| x.score).0);
+    // p(&grid);
+    // println!();
+
+    Some(res)
 }
 
 #[cfg(test)]
@@ -126,6 +157,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(81));
     }
 }
