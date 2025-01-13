@@ -60,6 +60,7 @@ impl std::fmt::Display for Tile2 {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 enum Instruction {
     N,
     E,
@@ -160,6 +161,12 @@ fn print_state(grid: &Grid<Tile>, robot: Robot) {
     char_grid.print();
 }
 
+fn print_state2(grid: &Grid<Tile2>, robot: Robot) {
+    let mut char_grid = grid.map(|x| format!("{x}"));
+    char_grid[robot] = "@".to_owned();
+    char_grid.print();
+}
+
 fn execute(
     mut grid: Grid<Tile>,
     mut robot: Robot,
@@ -184,11 +191,78 @@ fn execute(
     (grid, robot)
 }
 
+fn nudge(mut grid: Grid<Tile2>, point: Point, dir: Instruction) -> Grid<Tile2> {
+    // println!(
+    //     "({0}, {1}) {1}:{0} {2}",
+    //     point.x + 1,
+    //     point.y + 1,
+    //     grid[point]
+    // );
+    let mut grid = match grid[point] {
+        Tile2::Wall => {
+            panic!("Wall should never have been nudged while writing nudges")
+        }
+        Tile2::BoxLeft => nudge_box(grid, point, dir, Instruction::E),
+        Tile2::BoxRight => nudge_box(grid, point, dir, Instruction::W),
+        Tile2::Empty => grid,
+    };
+    // println!("{} <- {}", grid[point], grid[point - dir.v()]);
+    (grid[point], grid[point - dir.v()]) = (grid[point - dir.v()], grid[point]);
+    grid
+}
+
+fn nudge_box(
+    grid: Grid<Tile2>,
+    point: Point,
+    dir: Instruction,
+    other_dir: Instruction,
+) -> Grid<Tile2> {
+    let grid = nudge(grid, point + dir.v(), dir);
+    let grid = if let (Instruction::N | Instruction::S) = dir {
+        nudge(grid, point + dir.v() + other_dir.v(), dir)
+    } else {
+        grid
+    };
+    grid
+}
+
+fn check_nudge(grid: &Grid<Tile2>, point: Point, dir: Instruction) -> bool {
+    match grid[point] {
+        Tile2::Wall => false,
+        Tile2::BoxLeft => check_nudge_box(grid, point, dir, Instruction::E),
+        Tile2::BoxRight => check_nudge_box(grid, point, dir, Instruction::W),
+        Tile2::Empty => true,
+    }
+}
+
+fn check_nudge_box(
+    grid: &Grid<Tile2>,
+    point: Point,
+    dir: Instruction,
+    other_dir: Instruction,
+) -> bool {
+    check_nudge(&grid, point + dir.v(), dir)
+        && if let (Instruction::N | Instruction::S) = dir {
+            check_nudge(&grid, point + dir.v() + other_dir.v(), dir)
+        } else {
+            true
+        }
+}
+
+fn execute2(grid: Grid<Tile2>, mut robot: Robot, instruction: Instruction) -> (Grid<Tile2>, Robot) {
+    if check_nudge(&grid, robot + instruction.v(), instruction) {
+        let grid = nudge(grid, robot + instruction.v(), instruction);
+        (grid, robot + instruction.v())
+    } else {
+        (grid, robot)
+    }
+}
+
 pub fn part_one(input: &str) -> Option<u64> {
     let (mut grid, mut robot, instructions) = parse(input);
     for i in instructions {
         (grid, robot) = execute(grid, robot, i);
-        print_state(&grid, robot);
+        // print_state(&grid, robot);
     }
     let scores = Grid::new_with_dimensions(grid.dimension(), |p| {
         if let Tile::Box = grid[p] {
@@ -202,17 +276,20 @@ pub fn part_one(input: &str) -> Option<u64> {
 
 pub fn part_two(input: &str) -> Option<u64> {
     let (mut grid, mut robot, instructions) = parse2(input);
+    print_state2(&grid, robot);
     for i in instructions {
+        // println!("{:?}", i);
         (grid, robot) = execute2(grid, robot, i);
-        print_state(&grid, robot);
+        // print_state2(&grid, robot);
     }
     let scores = Grid::new_with_dimensions(grid.dimension(), |p| {
-        if let Tile::Box = grid[p] {
+        if let Tile2::BoxLeft = grid[p] {
             (p.x + p.y * 100) as u64
         } else {
             0
         }
     });
+
     Some(scores.0.into_iter().flatten().sum())
 }
 
@@ -229,6 +306,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(9021));
     }
 }
