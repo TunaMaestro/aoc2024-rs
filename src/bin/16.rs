@@ -47,9 +47,9 @@ fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<Vec<Point>>
     // dist[start] = Some(0);
 
     while let Some(Visit { p: node, score: k }) = visit.pop() {
-        if dist[node].map(|best_dist| k > best_dist).unwrap_or(false) {
-            continue;
-        }
+        // if dist[node].map(|best_dist| k > best_dist).unwrap_or(false) {
+        //     continue;
+        // }
         dist[node] = Some(k);
         for d in UP_RIGHT_DOWN_LEFT {
             //
