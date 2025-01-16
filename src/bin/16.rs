@@ -1,5 +1,8 @@
 use core::panic;
-use std::collections::{BinaryHeap, HashSet};
+use std::{
+    collections::{BinaryHeap, HashSet},
+    iter,
+};
 
 use aoc_utils::grid::{Grid, Point, UP_RIGHT_DOWN_LEFT};
 use lina::vec2;
@@ -38,18 +41,20 @@ fn weight(v: Point, w: Point, prev: Option<Point>) -> u64 {
     STRAIGHT_COST + if w - v == v - p { 0 } else { TURN_COST }
 }
 
-fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<Vec<Point>>) {
+fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<HashSet<Point>>) {
     let mut visit: BinaryHeap<Visit> = BinaryHeap::new();
     let mut dist = Grid::new_with_dimensions_uniform(g.dimension(), None);
-    let mut pred = Grid::new_with_dimensions(g.dimension(), |_| Vec::new());
+    let mut pred: Grid<HashSet<Point>> =
+        Grid::new_with_dimensions(g.dimension(), |_| HashSet::new());
 
     visit.push(Visit { p: start, score: 0 });
     // dist[start] = Some(0);
 
+    print_dist(&dist);
     while let Some(Visit { p: node, score: k }) = visit.pop() {
-        // if dist[node].map(|best_dist| k > best_dist).unwrap_or(false) {
-        //     continue;
-        // }
+        if dist[node].map(|best_dist| k > best_dist).unwrap_or(false) {
+            continue;
+        }
         dist[node] = Some(k);
         for d in UP_RIGHT_DOWN_LEFT {
             //
@@ -60,7 +65,13 @@ fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<Vec<Point>>
             if let Tile::Wall = g[neighbour] {
                 continue;
             }
-            let cost = weight(node, neighbour, pred[node].get(0).copied());
+            let cost = pred[node]
+                .iter()
+                .copied()
+                .map(Option::from)
+                .map(|x| weight(node, neighbour, x))
+                .min()
+                .unwrap_or_else(|| weight(node, neighbour, None));
             let neighbour_cost = k + cost;
             let neighbour_cmp_existing = dist[neighbour]
                 .map(|existing_cost| neighbour_cost.cmp(&existing_cost))
@@ -68,15 +79,21 @@ fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<Vec<Point>>
             if let (std::cmp::Ordering::Equal | std::cmp::Ordering::Less) = neighbour_cmp_existing {
                 dist[neighbour] = Some(neighbour_cost);
                 if neighbour_cmp_existing == std::cmp::Ordering::Less {
-                    // pred[neighbour].clear();
+                    pred[neighbour].clear();
                 }
-                pred[neighbour].push(node);
+                pred[neighbour].retain(|&prev| {
+                    //
+                    let cost_from_prev = weight(node, neighbour, Some(prev));
+                    cost_from_prev == neighbour_cost
+                });
+                pred[neighbour].insert(node);
                 visit.push(Visit {
                     p: neighbour,
                     score: neighbour_cost,
                 });
             }
         }
+        print_dist(&dist);
     }
     (dist, pred)
 }
@@ -86,19 +103,19 @@ fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<Vec<Point>>
 //     p.iter().map(|&prev| predecessors(pred, prev)).flatten()
 // }
 fn predecessors_r(
-    pred: &Grid<Vec<Point>>,
+    pred: &Grid<HashSet<Point>>,
     from: Point,
     mut points: HashSet<Point>,
 ) -> HashSet<Point> {
     println!("Predecessors of {from:?} = {:?}", &pred[from]);
+    points.insert(from);
     for &p in pred[from].iter() {
-        // points.insert(p);
         points = predecessors_r(pred, p, points);
     }
     points
 }
 
-fn predecessors(pred: &Grid<Vec<Point>>, from: Point) -> HashSet<Point> {
+fn predecessors(pred: &Grid<HashSet<Point>>, from: Point) -> HashSet<Point> {
     predecessors_r(pred, from, HashSet::new())
 }
 
@@ -116,15 +133,20 @@ fn solve(input: &str) -> (u64, u64) {
         _ => panic!("Unexpected character in input"),
     });
     let (dist, pred) = dijkstra(grid, start);
-    dist.map(|x| format!("{:>6}", x.map(|i| i.to_string()).unwrap_or("∞".to_owned())))
-        .print();
+    print_dist(&dist);
 
     assert!(dist[end].is_some(), "A distance should have been found.");
 
-    (
-        dist[end].expect("Expected path to Exit"),
-        predecessors(&pred, end).len() as u64,
-    )
+    let shortest_path = dist[end].expect("Expected path to Exit");
+
+    let unique_path_tiles = predecessors(&pred, end).len();
+    (shortest_path, unique_path_tiles as u64)
+}
+
+fn print_dist(dist: &Grid<Option<u64>>) {
+    dist.map(|x| format!("{:>6}", x.map(|i| i.to_string()).unwrap_or("∞".to_owned())))
+        .print();
+    println!();
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
@@ -150,7 +172,11 @@ mod tests {
         let result = part_two(&advent_of_code::template::read_file_part(
             "examples", DAY, 1,
         ));
-        assert_eq!(result, Some(16));
+        assert_eq!(result, Some(12));
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 2,
+        ));
+        assert_eq!(result, Some(7));
 
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
         assert_eq!(result, Some(64));

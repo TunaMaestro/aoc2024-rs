@@ -26,7 +26,7 @@ pub fn read_file(folder: &str, day: Day) -> String {
 
 /// Helper function that reads a text file to string, appending a part suffix. E.g. like `01-2.txt`.
 #[must_use]
-pub fn read_file_part(folder: &str, day: Day, part: u8) -> String {
+pub fn read_file_part<T: std::fmt::Display>(folder: &str, day: Day, part: T) -> String {
     let cwd = env::current_dir().unwrap();
     let filepath = cwd
         .join("data")
