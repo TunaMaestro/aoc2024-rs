@@ -48,7 +48,6 @@ dependencies = [
 [[package]]
 name = "aoc-utils"
 version = "0.1.0"
-source = "git+https://github.com/TunaMaestro/aoc-utils.git#a98a00d41297f173e4c0af15dae2dac3e3d9223e"
 dependencies = [
  "atoi",
  "lina",
