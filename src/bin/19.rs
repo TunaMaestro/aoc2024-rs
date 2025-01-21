@@ -1,6 +1,5 @@
-#![feature(let_chains)]
-
 use aoc_utils::debug::PrintBytes;
+use aoc_utils::ResultExt;
 use std::{array, collections::HashMap, io::BufRead, ops::Index, rc::Rc, sync::Arc};
 
 use itertools::Itertools;
@@ -39,98 +38,91 @@ fn parse<'a>(input: &'a str) -> (Vec<Pattern<'a>>, Vec<Pattern<'a>>) {
         .collect_vec();
 
     patterns.sort_unstable();
+    patterns.reverse();
     (patterns, goals)
 }
 
-fn find_prefixes_binary<'a, 'b>(
-    goal: Pattern<'b>,
-    patterns: &'a [Pattern<'a>],
-) -> &'a [Pattern<'a>] {
-    let last = patterns.binary_search(&goal);
-    match last {
-        Ok(index) => &patterns[index..index + 1],
-        Err(index) => {
-            let mut end = index;
-            while end > 0 && !goal.starts_with(patterns[end - 1]) {
-                end -= 1;
-            }
-            let mut k = end;
-            while k > 0 && goal.starts_with(patterns[k - 1]) {
-                k -= 1;
-            }
-            &patterns[k..end]
-        }
-    }
-}
-fn find_prefixes_linear<'a, 'b>(
-    goal: Pattern<'b>,
+fn find_prefixes_binary<'a>(
+    goal: Pattern<'a>,
     patterns: &'a [Pattern<'a>],
 ) -> impl 'a + Iterator<Item = Pattern<'a>> {
-    let goal = goal.to_owned();
+    let last = patterns.binary_search_by(|&el| el.cmp(goal).reverse());
+    // match last {
+    //     Ok(index) => &patterns[index..index + 1],
+    //     Err(index) => {
+    //         let mut end = index;
+    //         while end > 0 && !goal.starts_with(patterns[end - 1]) {
+    //             end -= 1;
+    //         }
+    //         let mut k = end;
+    //         while k > 0 && goal.starts_with(patterns[k - 1]) {
+    //             k -= 1;
+    //         }
+    //         &patterns[k..end]
+    //     }
+    // }
+
+    let mut search = last.into_inner();
+    core::iter::from_fn(move || {
+        if search >= patterns.len() {
+            return None;
+        }
+        if patterns[search][0] != goal[0] {
+            return None;
+        }
+        let to_return = patterns[search];
+        search += 1;
+
+        Some(to_return)
+    })
+    .filter(|&x| goal.starts_with(x))
+}
+fn find_prefixes_linear<'a>(
+    goal: Pattern<'a>,
+    patterns: &'a [Pattern<'a>],
+) -> impl 'a + Iterator<Item = Pattern<'a>> {
     patterns
         .iter()
         .filter(move |x| goal.starts_with(x))
         .copied()
 }
 
-fn find_prefixes<'a, 'b>(
-    goal: Pattern<'b>,
+fn find_prefixes<'a>(
+    goal: Pattern<'a>,
     patterns: &'a [Pattern<'a>],
 ) -> impl 'a + Iterator<Item = Pattern<'a>> {
-    find_prefixes_linear(goal, patterns)
+    // find_prefixes_linear(goal, patterns)
+    find_prefixes_binary(goal, patterns)
 }
 
-fn find_prefixes_collect<'a, 'b>(
-    goal: Pattern<'b>,
-    patterns: &'a [Pattern<'a>],
-) -> Vec<Pattern<'a>> {
+fn find_prefixes_collect<'a>(goal: Pattern<'a>, patterns: &'a [Pattern<'a>]) -> Vec<Pattern<'a>> {
     find_prefixes(goal, patterns).collect_vec()
 }
 
-type Out<'a> = Option<Vec<Pattern<'a>>>;
-
-fn hash(k: Pattern<'_>) -> u64 {
-    k.iter()
-        .copied()
-        .map(from)
-        .enumerate()
-        .map(|(i, x)| (5u64).pow(i as u32) * (x as u64))
-        .sum()
-}
-
-const MAX_MEMO_LEN: usize = 100;
-
-fn p_hash(memo: &mut HashMap<&'_ [Colour], Out<'_>>) {
+fn p_hash(memo: &mut HashMap<&'_ [Colour], Out2<'_>>) {
     (memo
         .iter()
         .map(|(&k, v)| {
-            inspect(k, v.as_ref());
+            // inspect(k, v.as_ref());
+            println!("{}: {}", k.display(), v.unwrap_or(0))
         })
         .count());
 }
+
+type Out<'a> = Option<Vec<Pattern<'a>>>;
 
 fn is_producable<'a>(
     goal: Pattern<'a>,
     patterns: &'a [Pattern<'a>],
     memo: &mut HashMap<&'a [Colour], Out<'a>>,
 ) -> Out<'a> {
-    // if goal.len() <= MAX_MEMO_LEN {
-    //     dbg!(hash(goal));
-    // }
     if goal.len() == 0 {
         Some(vec![])
     } else {
-        // println!("LOOKING UP:");
-        // goal.print();
-        if goal.len() <= MAX_MEMO_LEN
-            && let Some(existing) = memo.get(goal)
-        {
-            // println!("ALREADY IN HASH");
+        if let Some(existing) = memo.get(goal) {
             return existing.clone();
         }
-        // p_hash(memo);
         let res = find_prefixes(goal, patterns)
-            // .inspect(|&&pattern| pattern.print())
             .map(|prefix| is_producable(&goal[prefix.len()..], patterns, memo).map(|x| (prefix, x)))
             .flatten()
             .map(|(prefix, mut vec)| {
@@ -138,9 +130,57 @@ fn is_producable<'a>(
                 vec
             })
             .next();
-        if goal.len() <= MAX_MEMO_LEN {
-            memo.insert(goal, res.clone());
+        memo.insert(goal, res.clone());
+        res
+    }
+}
+
+type Out2<'a> = Option<u64>;
+
+fn is_producable2<'a>(
+    goal: Pattern<'a>,
+    patterns: &'a [Pattern<'a>],
+    memo: &mut HashMap<&'a [Colour], Out2<'a>>,
+) -> Out2<'a> {
+    if goal.len() == 0 {
+        Some(1)
+    } else {
+        if let Some(&existing) = memo.get(goal) {
+            return existing;
         }
+        let res = find_prefixes(goal, patterns)
+            .map(|prefix| {
+                is_producable2(&goal[prefix.len()..], patterns, memo).map(|x| (prefix, x))
+            })
+            .flatten()
+            .map(|(prefix, count)| count)
+            .sum1();
+        memo.insert(goal, res);
+        res
+    }
+}
+
+type Out3<'a> = Option<()>;
+
+fn is_producable3<'a>(
+    goal: Pattern<'a>,
+    patterns: &'a [Pattern<'a>],
+    memo: &mut HashMap<&'a [Colour], Out3<'a>>,
+) -> Out3<'a> {
+    if goal.len() == 0 {
+        Some(())
+    } else {
+        if let Some(&existing) = memo.get(goal) {
+            return existing;
+        }
+        let res = find_prefixes(goal, patterns)
+            .map(|prefix| {
+                is_producable3(&goal[prefix.len()..], patterns, memo).map(|x| (prefix, x))
+            })
+            .flatten()
+            .map(|(prefix, existing)| existing)
+            .next();
+        memo.insert(goal, res);
         res
     }
 }
@@ -178,9 +218,9 @@ pub fn part_one(input: &str) -> Option<u64> {
         goals
             .iter()
             .map(|goal| (goal, is_producable(goal, &patterns, &mut memo)))
-            .inspect(|(goal, x)| {
-                inspect(goal, x.as_ref());
-            })
+            // .inspect(|(goal, x)| {
+            //     inspect(goal, x.as_ref());
+            // })
             .map(|x| x.1)
             .flatten()
             .count() as u64,
@@ -188,7 +228,17 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    None
+    let (patterns, goals) = parse(input);
+    let mut memo = HashMap::new();
+    Some(
+        goals
+            .iter()
+            .map(|goal| (goal, is_producable2(goal, &patterns, &mut memo)))
+            // .inspect(|(goal, x)| println!("{}: {}", goal.display(), x.unwrap_or(0)))
+            .map(|x| x.1)
+            .flatten()
+            .sum(),
+    )
 }
 
 #[cfg(test)]
@@ -209,10 +259,10 @@ brgr
 bbrgwb
 ";
 
-    #[test]
-    fn test_hash() {
-        assert_ne!(hash(b"bwrgwb"), hash(b"bwrgww"));
-    }
+    // #[test]
+    // fn test_hash() {
+    //     assert_ne!(hash(b"bwrgwb"), hash(b"bwrgww"));
+    // }
     #[test]
     fn test_prefix() {
         let (patterns, goals) = parse(&INPUT);
@@ -252,6 +302,12 @@ bbrgwb
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(16));
+    }
+
+    #[test]
+    fn test_real_part_one() {
+        let result = part_one(&advent_of_code::template::read_file("inputs", DAY));
+        assert_eq!(result, Some(327));
     }
 }
