@@ -1,11 +1,14 @@
-use aoc_utils::debug::PrintBytes;
-use std::{array, io::BufRead, ops::Index, rc::Rc, sync::Arc};
+use std::{ops::Deref, rc::Rc};
 
 use itertools::Itertools;
 
 advent_of_code::solution!(19);
 
-type Pattern<'a> = &'a [Colour];
+type Pattern = Rc<[Colour]>;
+
+trait ColourTrait {
+    fn display(&self) -> String;
+}
 
 // struct Trie {}
 
@@ -18,24 +21,15 @@ type Pattern<'a> = &'a [Colour];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Colour(u8);
 
-trait ConvertToSlice {
-    fn print(&self);
-    fn display(&self) -> String;
-}
-
-impl<'a> ConvertToSlice for Pattern<'a> {
-    fn print(&self) {
-        let k = self.display();
-        println!("{k}");
-    }
-    fn display(&self) -> String {
-        String::from_utf8(self.iter().map(|x| x.to()).collect_vec()).unwrap()
-    }
-}
-
 const COLOURS: u8 = 5;
 const DEFINED_CHARS: &[u8; COLOURS as usize] = b"wubrg";
 const NON_COLOUR: u8 = u8::MAX;
+
+impl ColourTrait for &[Colour] {
+    fn display(&self) -> String {
+        String::from_utf8(self.iter().map(Colour::to).collect_vec()).unwrap()
+    }
+}
 
 impl Colour {
     fn from(char: u8) -> Self {
@@ -43,8 +37,9 @@ impl Colour {
             DEFINED_CHARS
                 .iter()
                 .position(|&x| x == char)
-                .map(|x| x.try_into().expect("Expected happy number"))
-                .unwrap_or(u8::MAX),
+                .expect("all input characters should be one of the provided colours")
+                .try_into()
+                .unwrap(),
         )
     }
 
@@ -53,61 +48,7 @@ impl Colour {
     }
 }
 
-struct Input<'a> {
-    raw: &'a [Colour],
-    patterns: Vec<&'a [Colour]>,
-    goals: Vec<&'a [Colour]>,
-}
-impl<'a> Input<'a> {
-    fn new(raw: &'a [Colour], pattern_lengths: Vec<usize>, goal_lengths: Vec<usize>) -> Self {
-        assert_eq!(
-            raw.len(),
-            pattern_lengths.iter().copied().sum::<usize>()
-                + goal_lengths.iter().copied().sum::<usize>()
-        );
-
-        let mut patterns = vec![];
-        let mut goals = vec![];
-
-        let mut i = 0;
-        for &len in &pattern_lengths {
-            let slice = &raw[i..i + len];
-            patterns.push(slice);
-            i += len;
-        }
-
-        for &len in &goal_lengths {
-            let slice = &raw[i..i + len];
-            patterns.push(slice);
-            i += len;
-        }
-        Input {
-            raw,
-            patterns,
-            goals,
-        }
-    }
-}
-
-// impl<'a> Input<'a> {
-fn write_slices<'a>(
-    raw: &'a [Colour],
-    patterns: &mut Vec<&'a [Colour]>,
-    goals: &mut Vec<&'a [Colour]>,
-    pattern_lengths: Vec<usize>,
-    goal_lengths: Vec<usize>,
-) {
-    // for (vec, lengths) in [(&mut patterns, pattern_lengths), (&mut goals, goal_lengths)] {
-    // let mut i = 0;
-    // for len in lengths {
-    //     vec.push(&raw[i..i + len]);
-    //     i += len;
-    // }
-    // }
-}
-// }
-
-fn parse<'a>(input: &'a str) -> (Box<[Colour]>, Vec<usize>, Vec<usize>) {
+fn parse(input: &str) -> (Vec<Pattern>, Vec<Pattern>) {
     let mut parts = input.split("\n\n");
     let mut patterns = parts
         .next()
@@ -123,66 +64,59 @@ fn parse<'a>(input: &'a str) -> (Box<[Colour]>, Vec<usize>, Vec<usize>) {
         .collect_vec();
 
     patterns.sort_unstable();
-    let raw: Box<[Colour]> = patterns
+
+    let patterns = patterns
         .iter()
-        .chain(goals.iter())
-        .map(|&x| x.iter().copied().map(Colour::from))
-        .flatten()
+        .map(|&x| x.iter().map(|&x| Colour::from(x)).collect::<Pattern>())
         .collect();
-    (
-        raw,
-        patterns.iter().map(|x| x.len()).collect(),
-        goals.iter().map(|x| x.len()).collect(),
-    )
+    let goals = goals
+        .iter()
+        .map(|&x| x.iter().map(|&x| Colour::from(x)).collect::<Pattern>())
+        .collect();
+    (patterns, goals)
 }
 
-fn find_prefixes_binary<'a, 'b>(
-    goal: Pattern<'b>,
-    patterns: &'a [Pattern<'a>],
-) -> &'a [Pattern<'a>] {
+fn find_prefixes_binary<'a>(goal: Pattern, patterns: &'a [Pattern]) -> &'a [Pattern] {
     let last = patterns.binary_search(&goal);
     match last {
         Ok(index) => &patterns[index..index + 1],
         Err(index) => {
             let mut end = index;
-            while end > 0 && !goal.starts_with(patterns[end - 1]) {
+            while end > 0 && !goal.starts_with(&patterns[end - 1]) {
                 end -= 1;
             }
             let mut k = end;
-            while k > 0 && goal.starts_with(patterns[k - 1]) {
+            while k > 0 && goal.starts_with(&patterns[k - 1]) {
                 k -= 1;
             }
             &patterns[k..end]
         }
     }
 }
-fn find_prefixes_linear<'a, 'b>(
-    goal: Pattern<'b>,
-    patterns: &'a [Pattern<'a>],
-) -> impl 'a + Iterator<Item = Pattern<'a>> {
+fn find_prefixes_linear<'a>(
+    goal: &[Colour],
+    patterns: &'a [Pattern],
+) -> impl 'a + Iterator<Item = Pattern> {
     let goal = goal.to_owned();
     patterns
         .iter()
         .filter(move |x| goal.starts_with(x))
-        .copied()
+        .cloned()
 }
 
-fn find_prefixes<'a, 'b>(
-    goal: Pattern<'b>,
-    patterns: &'a [Pattern<'a>],
-) -> impl 'a + Iterator<Item = Pattern<'a>> {
+fn find_prefixes<'a>(
+    goal: &[Colour],
+    patterns: &'a [Pattern],
+) -> impl 'a + Iterator<Item = Pattern> {
     find_prefixes_linear(goal, patterns)
 }
 
-fn find_prefixes_collect<'a, 'b>(
-    goal: Pattern<'b>,
-    patterns: &'a [Pattern<'a>],
-) -> Vec<Pattern<'a>> {
+fn find_prefixes_collect<'a>(goal: &[Colour], patterns: &'a [Pattern]) -> Vec<Pattern> {
     find_prefixes(goal, patterns).collect_vec()
 }
 
-fn is_producable<'a>(goal: Pattern<'a>, patterns: &'a [Pattern<'a>]) -> Option<Vec<Pattern<'a>>> {
-    goal.print();
+fn is_producable<'a>(goal: &[Colour], patterns: &'a [Pattern]) -> Option<Vec<Pattern>> {
+    println!("{}", goal.display());
     if goal.len() == 0 {
         Some(vec![])
     } else {
@@ -203,7 +137,7 @@ fn jump_points() {
     //
 }
 
-fn inspect(goal: Pattern, production: Option<&Vec<Pattern>>) {
+fn inspect(goal: &[Colour], production: Option<&Vec<Pattern>>) {
     let process = match production {
         Some(ps) => format!(
             "{}\u{001b}[m",
@@ -214,7 +148,7 @@ fn inspect(goal: Pattern, production: Option<&Vec<Pattern>>) {
                     format!(
                         "\u{001b}[{}m{}",
                         if i % 2 == 0 { "31" } else { "33" },
-                        x.display()
+                        x.deref().display()
                     )
                 })
                 .join("")
@@ -225,13 +159,11 @@ fn inspect(goal: Pattern, production: Option<&Vec<Pattern>>) {
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    let (raw, pattern_lens, goal_lens) = parse(input);
-    let input = Input::new(&raw, pattern_lens, goal_lens);
+    let (patterns, goals) = parse(input);
     Some(
-        input
-            .goals
+        goals
             .iter()
-            .map(|goal| (goal, is_producable(goal, &input.patterns)))
+            .map(|goal| (goal, is_producable(goal, &patterns)))
             .inspect(|(goal, x)| {
                 inspect(goal, x.as_ref());
             })
