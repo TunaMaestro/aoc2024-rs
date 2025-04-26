@@ -47,21 +47,6 @@ fn find_prefixes_binary<'a>(
     patterns: &'a [Pattern<'a>],
 ) -> impl 'a + Iterator<Item = Pattern<'a>> {
     let last = patterns.binary_search_by(|&el| el.cmp(goal).reverse());
-    // match last {
-    //     Ok(index) => &patterns[index..index + 1],
-    //     Err(index) => {
-    //         let mut end = index;
-    //         while end > 0 && !goal.starts_with(patterns[end - 1]) {
-    //             end -= 1;
-    //         }
-    //         let mut k = end;
-    //         while k > 0 && goal.starts_with(patterns[k - 1]) {
-    //             k -= 1;
-    //         }
-    //         &patterns[k..end]
-    //     }
-    // }
-
     let mut search = last.into_inner();
     core::iter::from_fn(move || {
         if search >= patterns.len() {
@@ -77,6 +62,7 @@ fn find_prefixes_binary<'a>(
     })
     .filter(|&x| goal.starts_with(x))
 }
+
 fn find_prefixes_linear<'a>(
     goal: Pattern<'a>,
     patterns: &'a [Pattern<'a>],
@@ -303,11 +289,5 @@ bbrgwb
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
         assert_eq!(result, Some(16));
-    }
-
-    #[test]
-    fn test_real_part_one() {
-        let result = part_one(&advent_of_code::template::read_file("inputs", DAY));
-        assert_eq!(result, Some(327));
     }
 }

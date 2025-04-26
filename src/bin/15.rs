@@ -276,7 +276,7 @@ pub fn part_one(input: &str) -> Option<u64> {
 
 pub fn part_two(input: &str) -> Option<u64> {
     let (mut grid, mut robot, instructions) = parse2(input);
-    print_state2(&grid, robot);
+    // print_state2(&grid, robot);
     for i in instructions {
         // println!("{:?}", i);
         (grid, robot) = execute2(grid, robot, i);

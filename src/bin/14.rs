@@ -93,11 +93,11 @@ pub fn part_one(input: &str) -> Option<u64> {
     for r in after {
         view[r.p] += 1;
     }
-    println!(
-        "{}",
-        view.map(|x| char::from_digit(*x as u32, 16).unwrap() as u8)
-            .display()
-    );
+    // println!(
+    //     "{}",
+    //     view.map(|x| char::from_digit(*x as u32, 16).unwrap() as u8)
+    //         .display()
+    // );
     Some(counts.into_iter().product::<I>() as u64)
 }
 
@@ -132,14 +132,18 @@ fn step(mut robots: Vec<Robot>, dim: Vec2<I>) -> Vec<Robot> {
     robots
 }
 
+const INPUT: bool = false;
+
 pub fn part_two(input: &str) -> Option<u64> {
     let (mut r, dim) = parse(input);
 
     let mut view = Grid::new_with_dimensions_uniform(dim, 0);
     for seconds in 1.. {
-        println!("{seconds}");
         r = step(r, dim);
         if filter_possible_tree(&r) {
+            if !INPUT {
+                return Some(seconds);
+            }
             print_grid(&r, &mut view);
             if !wait() {
                 return Some(seconds);

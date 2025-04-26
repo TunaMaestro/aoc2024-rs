@@ -225,8 +225,8 @@ impl Iterator for Cpu {
 
 pub fn part_one(input: &str) -> Option<String> {
     let cpu = Cpu::read(input).unwrap();
-    println!("{}\n----------------------------", &cpu);
-    println!("initial method: ----------------------------------");
+    // println!("{}\n----------------------------", &cpu);
+    // println!("initial method: ----------------------------------");
     let outs: Vec<_> = cpu
         .clone()
         // .inspect(|x| {
@@ -234,7 +234,7 @@ pub fn part_one(input: &str) -> Option<String> {
         // })
         .flatten()
         .collect();
-    println!("im_fkin_stupid: ----------------------------------");
+    // println!("im_fkin_stupid: ----------------------------------");
     // let outs = im_fkin_stupid(cpu);
     Some(outs.iter().join(","))
 }

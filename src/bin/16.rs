@@ -50,7 +50,7 @@ fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<HashSet<Poi
     visit.push(Visit { p: start, score: 0 });
     // dist[start] = Some(0);
 
-    print_dist(&dist);
+    // print_dist(&dist);
     while let Some(Visit { p: node, score: k }) = visit.pop() {
         if dist[node].map(|best_dist| k > best_dist).unwrap_or(false) {
             continue;
@@ -93,7 +93,7 @@ fn dijkstra(g: Grid<Tile>, start: Point) -> (Grid<Option<u64>>, Grid<HashSet<Poi
                 });
             }
         }
-        print_dist(&dist);
+        // print_dist(&dist);
     }
     (dist, pred)
 }
@@ -107,7 +107,7 @@ fn predecessors_r(
     from: Point,
     mut points: HashSet<Point>,
 ) -> HashSet<Point> {
-    println!("Predecessors of {from:?} = {:?}", &pred[from]);
+    // println!("Predecessors of {from:?} = {:?}", &pred[from]);
     points.insert(from);
     for &p in pred[from].iter() {
         points = predecessors_r(pred, p, points);
@@ -133,7 +133,7 @@ fn solve(input: &str) -> (u64, u64) {
         _ => panic!("Unexpected character in input"),
     });
     let (dist, pred) = dijkstra(grid, start);
-    print_dist(&dist);
+    // print_dist(&dist);
 
     assert!(dist[end].is_some(), "A distance should have been found.");
 
